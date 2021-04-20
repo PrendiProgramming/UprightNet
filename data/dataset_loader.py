@@ -6,11 +6,27 @@ from data.image_folder import *
 import sys
 
 
+class InferenceDataLoader(BaseDataLoader):
+    def __init__(self, opt, img_path, is_train, _batch_size, num_threads):
+        dataset = InferenceFolder(opt=opt,
+            img_path =img_path, is_train=is_train)
+        self.data_loader = torch.utils.data.DataLoader(dataset,
+            batch_size=_batch_size, shuffle=is_train, num_workers=int(num_threads))
+        self.dataset = dataset
+
+    def load_data(self):
+        return self.data_loader
+
+    def name(self):
+        return 'InferenceDataLoader'
+
+    def __len__(self):
+        return len(self.dataset)
 class InteriorNetRyDataLoader(BaseDataLoader):
     def __init__(self, opt, list_path, is_train, _batch_size, num_threads):
-        dataset = InteriorNetRyFolder(opt=opt, 
+        dataset = InteriorNetRyFolder(opt=opt,
             list_path =list_path, is_train=is_train)
-        self.data_loader = torch.utils.data.DataLoader(dataset, 
+        self.data_loader = torch.utils.data.DataLoader(dataset,
             batch_size=_batch_size, shuffle=is_train, num_workers=int(num_threads))
         self.dataset = dataset
 
@@ -19,7 +35,7 @@ class InteriorNetRyDataLoader(BaseDataLoader):
 
     def name(self):
         return 'InteriorNetRyDataLoader'
-    
+
     def __len__(self):
         return len(self.dataset)
 

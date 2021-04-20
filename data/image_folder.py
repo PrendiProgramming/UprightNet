@@ -21,11 +21,11 @@ VIZ = False
 
 def decompose_rotation(R):
 
-    pitch_2 = math.atan2(-R[2,0], 
+    pitch_2 = math.atan2(-R[2,0],
                          math.sqrt(R[0, 0]**2 + R[1, 0]**2))
-    roll_2 = math.atan2(R[2, 1]/math.cos(pitch_2), 
+    roll_2 = math.atan2(R[2, 1]/math.cos(pitch_2),
                         R[2, 2]/math.cos(pitch_2))
-    yaw_2 = math.atan2(R[1,0]/math.cos(pitch_2), 
+    yaw_2 = math.atan2(R[1,0]/math.cos(pitch_2),
                        R[0,0]/math.cos(pitch_2))
 
     return [roll_2, pitch_2,yaw_2]
@@ -73,6 +73,87 @@ def skew(x):
                      [x[2], 0, -x[0]],
                      [-x[1], x[0], 0]])
 
+
+class InferenceFolder(data.Dataset):
+
+    def __init__(self, opt, img_path, is_train):
+        self.img_list = [img_path]
+        self.opt = opt
+        self.input_width = 384
+        self.input_height = 288
+
+        self.is_train = is_train
+
+        self.rot_range = 10
+        self.reshape = False
+        self.lr_threshold = 4.
+        self.fx = 600.
+        self.fy = 600.
+
+    def load_imgs(self, img_path):
+        img = cv2.imread(img_path)
+        img = img[:, :, ::-1]
+        return {'img': img}
+
+
+    def resize_imgs(self, train_data, resized_width, resized_height):
+        train_data['img'] = cv2.resize(train_data['img'],
+                                       (resized_width, resized_height),
+                                       interpolation=cv2.INTER_AREA)
+        return train_data
+
+    def crop_imgs(self, train_data, start_x, start_y, crop_w, crop_h):
+        train_data['img'] = train_data['img'][start_y:start_y+crop_h,
+                                              start_x:start_x+crop_w, :]
+        return train_data
+
+    def load_precomputed_crop_hw(self, normal_path):
+        crop_hw_path = normal_path.replace('normal_pair', 'precomputed_crop_hw')[:-4] + '.txt'
+
+        with open(crop_hw_path, 'r') as f:
+            crop_hw = f.readlines()
+            crop_h, crop_w = crop_hw[0].split()
+
+
+        return int(crop_h), int(crop_w)
+
+    def __getitem__(self, index):
+        targets_1 = {}
+
+        normal_path = self.img_list[index].rstrip()#.split()
+
+        img_path = normal_path.replace('normal_pair', 'rgb') #+ '.png'
+
+        train_data = self.load_imgs(img_path)
+
+        original_h, original_w = train_data['img'].shape[0], train_data['img'].shape[1]
+
+        crop_h = original_h
+        crop_w = original_w
+        start_y = int((original_h - crop_h)/2)
+        start_x = int((original_w - crop_w)/2)
+
+        train_data = self.crop_imgs(train_data, start_x, start_y, crop_w, crop_h)
+        train_data = self.resize_imgs(train_data, self.input_width, self.input_height)
+
+        ratio_x = float(train_data['img'].shape[1])/float(crop_w)
+        ratio_y = float(train_data['img'].shape[0])/float(crop_h)
+
+        fx = self.fx * ratio_x
+        fy = self.fy * ratio_y
+
+        img_1 = np.float32(train_data['img'])/255.0
+
+        final_img = torch.from_numpy(np.ascontiguousarray(img_1).transpose(2,0,1)).contiguous().float()
+        targets_1['img_path'] = img_path
+        # targets_1['normal_path'] = normal_path
+        # targets_1['fx'] = fx
+        # targets_1['fy'] = fy
+
+        return final_img, targets_1
+
+    def __len__(self):
+        return len(self.img_list)
 
 class InteriorNetRyFolder(data.Dataset):
 
@@ -250,7 +331,7 @@ class InteriorNetRyFolder(data.Dataset):
                                         start_x, start_y, 
                                         crop_w, crop_h)
             train_data = self.resize_imgs(train_data, 
-                                        self.input_width, 
+                                        self.input_width,
                                         self.input_height)
 
         else:
@@ -357,10 +438,7 @@ class InteriorNetRyFolder(data.Dataset):
         return final_img, targets_1
 
     def __len__(self):
-        return len(self.img_list)
-
-
-# class SUN360Folder(data.Dataset):
+        return len(self.img_list)# class SUN360Folder(data.Dataset):
 
 #     def __init__(self, opt, list_path, is_train):
 #         img_list = make_dataset(list_path)
@@ -461,7 +539,7 @@ class InteriorNetRyFolder(data.Dataset):
 #         poses_path = img_path.replace('rgb/', 'poses/').replace('.png', '_true_camera_rotation.txt')
 #         intrinsic_path = img_path.replace('rgb/', 'intrinsic/').replace('.png', '_true_camera_intrinsic.txt')
 
-#         train_data = self.load_imgs(img_path, poses_path)       
+#         train_data = self.load_imgs(img_path, poses_path)
 #         original_h, original_w = train_data['img'].shape[0], train_data['img'].shape[1]
 #         fx_o, fy_o = self.load_intrinsic(intrinsic_path)
 
@@ -484,7 +562,7 @@ class InteriorNetRyFolder(data.Dataset):
 #         gt_vfov = 2 * math.atan(float(img_h)/(2*fy))
 #         gt_up_vector = R_g_c[2, :]
 
-#         gt_rp = np.array([gt_roll, gt_pitch]) 
+#         gt_rp = np.array([gt_roll, gt_pitch])
 
 #         if VIZ:
 #             hl_left, hl_right = getHorizonLineFromAngles(gt_pitch, gt_roll, gt_vfov, img_h, img_w)
@@ -500,15 +578,15 @@ class InteriorNetRyFolder(data.Dataset):
 
 #             plt.figure(figsize=(10, 6))
 #             plt.subplot(2,1,1)
-#             plt.imshow(img_1) 
+#             plt.imshow(img_1)
 #             plt.subplot(2,1,2)
 #             plt.imshow(mask, cmap='gray')
 
 #             # plt.subplot(2,2,3)
-#             # plt.imshow((cam_normal+1.)/2.0) 
+#             # plt.imshow((cam_normal+1.)/2.0)
 
 #             # plt.subplot(2,2,4)
-#             # plt.imshow((upright_normal+1.)/2.0) 
+#             # plt.imshow((upright_normal+1.)/2.0)
 
 #             plt.savefig(img_path.split('/')[-1])
 #             print('train we are good MP')
@@ -577,18 +655,20 @@ class ScanNetFolder(data.Dataset):
 
         upright_normal = self.rotate_normal(R_g_c, cam_normal)
 
-        return {'img': img, 
-                'cam_normal':cam_normal, 
+        return {
+            'img': img,
+                'cam_normal':cam_normal,
                 'upright_normal':upright_normal,
                 'mask':mask,
-                'R_g_c': R_g_c, 
-                'intrinsic':intrinsic}
+                'R_g_c': R_g_c,
+                'intrinsic':intrinsic
+            }
 
     def resize_imgs(self, train_data, resized_width, resized_height):
-        train_data['img'] = cv2.resize(train_data['img'], 
-                                      (resized_width, resized_height), 
+        train_data['img'] = cv2.resize(train_data['img'],
+                                      (resized_width, resized_height),
                                       interpolation=cv2.INTER_AREA)
-        train_data['cam_normal'] = cv2.resize(train_data['cam_normal'], 
+        train_data['cam_normal'] = cv2.resize(train_data['cam_normal'],
                                       (resized_width, resized_height), 
                                       interpolation=cv2.INTER_NEAREST)
         train_data['upright_normal'] = cv2.resize(train_data['upright_normal'], 

@@ -37,7 +37,7 @@ class UprightNet(BaseModel):
             sys.exit()
 
         if not _isTrain:
-            if opt.dataset == 'interiornet':            
+            if opt.dataset == 'interiornet':
                 model_name = '_best_interiornet_ry_exp_upright_9_sphere_ls_mode_ResnetModel3HeadsSplitNormalizationTightCoupled_lr_0.0004_w_svd_2.0_w_grad_0.25_backprop_eig_1'
             else:
                 model_name = '_best_scannet_exp_upright_9_sphere_ls_mode_ResnetModel3HeadsSplitNormalizationTightCoupled_lr_0.0004_w_svd_0.5_w_grad_0.25_backprop_eig_1'
@@ -45,7 +45,7 @@ class UprightNet(BaseModel):
             model_parameters = self.load_network(new_model, 'G', model_name)
             new_model.load_state_dict(model_parameters)
 
-        new_model = torch.nn.parallel.DataParallel(new_model.cuda(), 
+        new_model = torch.nn.parallel.DataParallel(new_model.cuda(),
                                                   device_ids = [0])
         self.netG = new_model
         self.criterion_joint = networks.JointLoss(opt) 
@@ -83,15 +83,15 @@ class UprightNet(BaseModel):
 
 
     def write_summary_train(self, mode_name, input_images,
-                            pred_cam_geo_unit, 
+                            pred_cam_geo_unit,
                             pred_up_geo_unit,
                             pred_weights,
                             cam_n_term, upright_n_term, 
                             pose_term,
                             targets, n_iter):
 
-        pred_cam_geo = torch.cat((pred_cam_geo_unit[:, 0:3, :, :], 
-                                  pred_cam_geo_unit[:, 3:6, :, :], 
+        pred_cam_geo = torch.cat((pred_cam_geo_unit[:, 0:3, :, :],
+                                  pred_cam_geo_unit[:, 3:6, :, :],
                                   pred_cam_geo_unit[:, 6:9, :, :]), 2)
 
         pred_cam_geo_rgb = (pred_cam_geo + 1.)/2.
@@ -151,13 +151,13 @@ class UprightNet(BaseModel):
 
 
     def write_summary_val(self, mode_name, input_images,
-                          pred_cam_geo_unit, 
+                          pred_cam_geo_unit,
                           pred_up_geo_unit,
                           pred_weights,
                           targets, n_iter):
 
-        pred_cam_geo = torch.cat((pred_cam_geo_unit[:, 0:3, :, :], 
-                                  pred_cam_geo_unit[:, 3:6, :, :], 
+        pred_cam_geo = torch.cat((pred_cam_geo_unit[:, 0:3, :, :],
+                                  pred_cam_geo_unit[:, 3:6, :, :],
                                   pred_cam_geo_unit[:, 6:9, :, :]), 2)
         pred_cam_geo_rgb = (pred_cam_geo + 1.)/2.
 
@@ -217,7 +217,7 @@ class UprightNet(BaseModel):
         # Combined loss
         self.loss_joint, cam_n_term, \
         upright_n_term, pose_term = self.criterion_joint(self.input_images, 
-                                                         self.pred_cam_geo_unit, 
+                                                         self.pred_cam_geo_unit,
                                                          self.pred_up_geo_unit,
                                                          self.pred_weights,
                                                          self.targets)
@@ -227,10 +227,10 @@ class UprightNet(BaseModel):
         if n_iter % 500 == 0:
 
             self.write_summary_train('Train', self.input_images,
-                                     self.pred_cam_geo_unit, 
+                                     self.pred_cam_geo_unit,
                                      self.pred_up_geo_unit,
                                      self.pred_weights,
-                                     cam_n_term, upright_n_term, 
+                                     cam_n_term, upright_n_term,
                                      pose_term,
                                      self.targets, n_iter)
 
@@ -243,10 +243,23 @@ class UprightNet(BaseModel):
         self.backward_G(n_iter)
         self.optimizer_G.step()
 
+    def infer_model(self, input_, targets):
+        # switch to evaluation mode
+        with torch.no_grad():
+            input_imgs = Variable(input_.cuda() , requires_grad = False)
+
+            pred_cam_geo, pred_up_geo, pred_weights = self.netG.forward(input_imgs)
+            # normalize predicted surface nomral
+            pred_cam_geo_unit = self.criterion_joint.normalize_coords(pred_cam_geo)
+            pred_up_geo_unit = self.criterion_joint.normalize_normal(pred_up_geo)
+
+        return self.criterion_joint.compute_cam_angle(pred_cam_geo_unit.data, pred_up_geo_unit.data, pred_weights, targets)
+
+
     def evaluate_normal_pose(self, input_, targets, n_iter, write_summary):
 
         # switch to evaluation mode
-        with torch.no_grad():           
+        with torch.no_grad():
             input_imgs = Variable(input_.cuda() , requires_grad = False)
 
             pred_cam_geo, pred_up_geo, pred_weights = self.netG.forward(input_imgs)
@@ -258,14 +271,14 @@ class UprightNet(BaseModel):
             gt_upright_geo = targets['upright_geo'].cuda()
             gt_mask = targets['gt_mask'].cuda()
 
-            cam_n_error = self.criterion_joint.compute_normal_error(pred_cam_geo[:, 0:3, :, :].data, 
-                                                                    gt_cam_geo[:, 0:3, :, :], 
+            cam_n_error = self.criterion_joint.compute_normal_error(pred_cam_geo[:, 0:3, :, :].data,
+                                                                    gt_cam_geo[:, 0:3, :, :],
                                                                     gt_mask)
-            cam_u_error = self.criterion_joint.compute_normal_error(pred_cam_geo[:, 3:6, :, :].data, 
-                                                                    gt_cam_geo[:, 3:6, :, :], 
+            cam_u_error = self.criterion_joint.compute_normal_error(pred_cam_geo[:, 3:6, :, :].data,
+                                                                    gt_cam_geo[:, 3:6, :, :],
                                                                     gt_mask)
 
-            rotation_error, roll_error, pitch_error = self.criterion_joint.compute_angle_error(pred_cam_geo_unit.data, 
+            rotation_error, roll_error, pitch_error = self.criterion_joint.compute_angle_error(pred_cam_geo_unit.data,
                                                                                                pred_up_geo_unit.data,
                                                                                                pred_weights,
                                                                                                targets)
@@ -273,7 +286,7 @@ class UprightNet(BaseModel):
             if write_summary:
                 print('==================== WRITING EVAL SUMMARY ==================')
                 self.write_summary_val('Eval', input_imgs,
-                                        pred_cam_geo_unit, 
+                                        pred_cam_geo_unit,
                                         pred_up_geo_unit,
                                         pred_weights,
                                         targets, n_iter)
@@ -284,7 +297,7 @@ class UprightNet(BaseModel):
     def test_angle_error(self, input_, targets):
 
         # switch to evaluation mode
-        with torch.no_grad():           
+        with torch.no_grad():
             input_imgs = Variable(input_.cuda() , requires_grad = False)
 
             pred_cam_geo, pred_up_geo, pred_weights = self.netG.forward(input_imgs)
@@ -294,7 +307,7 @@ class UprightNet(BaseModel):
 
 
             rotation_error, roll_error, \
-            pitch_error = self.criterion_joint.compute_angle_error(pred_cam_geo_unit.data, 
+            pitch_error = self.criterion_joint.compute_angle_error(pred_cam_geo_unit.data,
                                                                    pred_up_geo_unit.data,
                                                                    pred_weights,
                                                                    targets, stack_error=True)

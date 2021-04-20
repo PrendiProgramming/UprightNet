@@ -27,12 +27,12 @@ Our upright and local coordinate systems are defined as follows (corresponding t
 	python train.py --mode ResNet --dataset interiornet --w_grad 0.25 --w_pose 2.0
 ```
 
-* To train the network on the ScanNet, run 
+* To train the network on the ScanNet, run
 ```bash
 	python train.py --mode ResNet --dataset scannet --w_grad 0.25 --w_pose 0.5
 ```
 
-## Testing: 
+## Testing:
 * Download checkpoints.zip from [link](https://drive.google.com/drive/folders/1WdNAESqDYcUPQyXAW6PvlcdQIYlOEXIw?usp=sharing), unzip it and make sure checkpoints folder is in the root directory of codebase.
 
 * To evaluate InteriorNet pretrained network on the InteriorNet testset, run
@@ -40,9 +40,21 @@ Our upright and local coordinate systems are defined as follows (corresponding t
 	python test.py --mode ResNet --dataset interiornet
 ```
 
-* To evaluate ScanNet pretrained network on the ScanNet testset, run 
+* To evaluate ScanNet pretrained network on the ScanNet testset, run
 ```bash
 	python test.py --mode ResNet --dataset scannet
 ```
 
+## Inference
+* Download checkpoints.zip from [link](https://drive.google.com/drive/folders/1WdNAESqDYcUPQyXAW6PvlcdQIYlOEXIw?usp=sharing), unzip it and make sure checkpoints folder is in the root directory of codebase.
+
+* To run inference using an InteriorNet pretrained network on a custom image:
+```bash
+	python inference.py --mode ResNet --dataset interiornet --img_path /home/appuser/cutout/UprightNet/inference_images/2.jpg
+```
+
+* To run inference using an ScanNet pretrained network on a custom image:
+```bash
+	python inference.py --mode ResNet --dataset scannet --img_path /home/appuser/cutout/UprightNet/inference_images/2.jpg
+```
 
