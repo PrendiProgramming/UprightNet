@@ -1,4 +1,4 @@
-from data.dataset_loader import *
+from .dataset_loader import *
 
 def CreateInferenceDataLoader(opt, img_path,
 								is_train, _batch_size,

@@ -1,6 +1,6 @@
 import argparse
 import os
-from util import util
+from ..util import util
 
 def mkdirs(paths):
     if isinstance(paths, list) and not isinstance(paths, str):
